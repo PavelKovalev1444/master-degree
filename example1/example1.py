@@ -10,3 +10,5 @@ with db.session() as session:
             })
         '''
         session.run(query)
+
+# MATCH (n) DETACH DELETE n
