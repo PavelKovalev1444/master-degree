@@ -10,6 +10,7 @@ class DataPreparator(object):
 
 
     def get_movies(self) -> pd.DataFrame:
+        # нормально переименовать колонки
         self.movies_df = self.df[[
             'title', 
             # 'Movie_Rating', 
@@ -19,20 +20,9 @@ class DataPreparator(object):
             'MPAA_Rating', 
             # 'Directed_By', 
             # 'Starring', 
-            'Price'
+            'Price',
+            'genre'
         ]]
-
-        self.movies_df.columns = [
-            'title', 
-            # 'Movie_Rating',
-            # 'No_of_Ratings',
-            'Format',
-            'ReleaseYear',
-            'MPAA_Rating',
-            # 'Directed_By',
-            # 'Starring',
-            'Price'
-        ]
 
         if self.enable_saving_to_csv:
             self.movies_df.to_csv('./tmp/nodes_movies.csv', index=False)
@@ -42,8 +32,6 @@ class DataPreparator(object):
 
     def get_directors(self) -> pd.DataFrame:
         directors_df = self.df[['Directed_By']]
-
-        directors_df.columns = ['Directed_By']
 
         directors_list = []
         
@@ -58,21 +46,69 @@ class DataPreparator(object):
             self.directors_list_df.to_csv('./tmp/nodes_directors.csv', index=False)
 
         return self.directors_list_df
+    
+
+    def get_genres(self, path: str) -> pd.DataFrame:
+        self.genres_df = pd.read_csv(path)
+
+        return self.genres_df
+    
+    def get_users(self, path: str) -> pd.DataFrame:
+        self.users_df = pd.read_csv(path)
+
+        return self.users_df
 
 
-    def get_relations(self) -> pd.DataFrame:
+    def get_director_relations(self) -> pd.DataFrame:
         relations = []
         for idx, row in self.df.iterrows():
             if pd.notna(row['Directed_By']):
                 for director in row['Directed_By'].split(','):
                     relations.append({
                         'title': row['title'],
-                        'director': director.strip()
+                        'director': director.strip(),
                     })
 
         relations_df = pd.DataFrame(relations)
 
         if self.enable_saving_to_csv:
-            relations_df.to_csv('./tmp/relations.csv', index=False)
+            relations_df.to_csv('./tmp/director_relations.csv', index=False)
 
         return relations_df
+
+
+    def get_genre_relation(self):
+        relations = []
+        for idx, row in self.df.iterrows():
+            if pd.notna(row['genre']):
+                for genre in row['genre'].split(','):
+                    relations.append({
+                        'title': row['title'],
+                        'genre': genre.strip()
+                    })
+
+        relations_df = pd.DataFrame(relations)
+
+        if self.enable_saving_to_csv:
+            relations_df.to_csv('./tmp/genre_relations.csv', index=False)
+
+        return relations_df
+    
+
+    def get_user_relation(self):
+        relations = []
+        for idx, row in self.df.iterrows():
+            if pd.notna(row['rated_by']):
+                for user in row['rated_by'].split(','):
+                    relations.append({
+                        'title': row['title'],
+                        'userId': user.strip()
+                    })
+
+        relations_df = pd.DataFrame(relations)
+
+        if self.enable_saving_to_csv:
+            relations_df.to_csv('./tmp/user_relations.csv', index=False)
+
+        return relations_df
+

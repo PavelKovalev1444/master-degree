@@ -15,25 +15,32 @@ args = parser.parse_args()
 def main():
     db_connector = DatabaseClient()
     data_preparator = DataPreparator('./dataset.csv', True)
-
+    
     movies = data_preparator.get_movies()
     directors = data_preparator.get_directors()
-    relations = data_preparator.get_relations()
+    users = data_preparator.get_users('./users.csv')
+    genres = data_preparator.get_genres('./genres.csv')
+    
+    director_relations = data_preparator.get_director_relations()
+    user_relations = data_preparator.get_user_relation()
+    genre_relations = data_preparator.get_genre_relation()
 
     db = db_connector.connect_to_db()
 
     core = Core()
 
-    core.load_csvs(db, movies, directors, relations)
+    core.load_csvs(db, movies, directors, users, genres)
+    core.load_relations(db, director_relations, user_relations, genre_relations)
 
-    movie_description = {
+    recommendation_meta_info = {
         'title': args['title'],
         'director': args['director'],
         'price': args['price'],
         'starring': args['starring']
     }
 
-    res = core.get_recommendation(db, movie_description)
+    rec1 = core.get_content_based_recommendation(db, recommendation_meta_info)
+    rec2 = core.get_collaborative_filtering_recommendation(db, recommendation_meta_info)
 
     db_connector.close_connection()
 
