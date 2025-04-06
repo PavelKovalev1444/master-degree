@@ -5,11 +5,16 @@ class DataSerializer(object):
         pass
 
 
-    def serialize_movie(self, movie):
+    def serialize_content_based(self, item):
         return {
-            "format": movie["format"],
-            "price": movie["price"],
-            "releaseYear": movie["releaseYear"],
-            "title": movie["title"],
-            "mpaa_rating": movie["mpaa_rating"],
+            'title': item['title'],
+            'genres': item['genres'],
+            'score': item['score']
+        }
+    
+
+    def serialize_collaborative(self, item):
+        return {
+            'title': item['title'],
+            'score': item['score']
         }

@@ -30,12 +30,13 @@ def create_users_dataframe():
     people_dataframe.columns = ['Name']
 
     users_list = []
+    i = 0
 
     for item in people_dataframe['Name'].fillna('').str.split(','):
         if isinstance(item, list):
             for el in item:
-                id = uuid.uuid1()
-                users_list.append({'id': id, 'name': el.strip()})
+                users_list.append({'id': str(i), 'name': el.strip()})
+                i += 1
 
     users_dataframe = pd.DataFrame(users_list, columns=['id', 'name'])
 
