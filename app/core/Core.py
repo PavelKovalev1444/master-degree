@@ -1,17 +1,24 @@
-from neo4j import GraphDatabase
-
 from serializer.DataSerializer import DataSerializer
+
+import math
+
+
+SIMILARITY_LIMIT = 0.5
 
 
 class Core(object):
 
 
     def __init__(self):
+        self.serializer = DataSerializer()
         pass
 
 
     def load_movies(self, db, movies_df):
-        for i in range(5):
+        iters = len(movies_df)
+        # iters = 20
+
+        for i in range(iters):
             nodes_dict = movies_df.iloc[i].fillna(0).to_dict()
             with db.session() as session:
                 query = """
@@ -30,7 +37,10 @@ class Core(object):
     
     
     def load_directors(self, db, directors_df):
-        for i in range(5):
+        iters = len(directors_df)
+        # iters = 20
+
+        for i in range(iters):
             nodes_dict = directors_df.iloc[i].fillna(0).to_dict()
             with db.session() as session:
                 query = """
@@ -45,7 +55,10 @@ class Core(object):
 
 
     def load_users(self, db, users_df):
-        for i in range(5):
+        iters = len(users_df)
+        # iters = 20
+
+        for i in range(iters):
             nodes_dict = users_df.iloc[i].fillna(0).to_dict()
             with db.session() as session:
                 query = """
@@ -61,7 +74,9 @@ class Core(object):
 
 
     def load_genres(self, db, genres_df):
-        for i in range(5):
+        iters = len(genres_df)
+
+        for i in range(iters):
             nodes_dict = genres_df.iloc[i].fillna(0).to_dict()
             with db.session() as session:
                 query = """
@@ -75,9 +90,7 @@ class Core(object):
                 session.run(query, nodes=nodes_dict)
 
 
-    # def load_csvs(self, db, movies_df, directors_df, users_df, genres_df, relations_df):
     def load_csvs(self, db, movies_df, directors_df, users_df, genres_df):
-
         self.load_movies(db, movies_df)
         self.load_directors(db, directors_df)
         self.load_users(db, users_df)
@@ -85,7 +98,10 @@ class Core(object):
 
     
     def load_director_relations(self, db, relations_df):
-        for i in range(5):
+        iters = len(relations_df)
+        # iters = 20
+
+        for i in range(iters):
             nodes_dict = relations_df.iloc[i].fillna(0).to_dict()
             with db.session() as session:
                 query = """
@@ -104,7 +120,10 @@ class Core(object):
 
     
     def load_user_relations(self, db, relations_df):
-        for i in range(5):
+        iters = len(relations_df)
+        # iters = 20
+
+        for i in range(iters):
             nodes_dict = relations_df.iloc[i].fillna(0).to_dict()
             with db.session() as session:
                 query = """
@@ -115,7 +134,7 @@ class Core(object):
                     MATCH (u:User {
                         id: node.userId
                     })
-                    CREATE (u)-[:RATED]->(m)
+                    CREATE (u)-[:HAS_WATCHED]->(m)
                     RETURN m, u
                 """
 
@@ -123,14 +142,17 @@ class Core(object):
 
 
     def load_genre_relations(self, db, relations_df):
-        for i in range(5):
+        iters = len(relations_df)
+        # iters = 20
+
+        for i in range(iters):
             nodes_dict = relations_df.iloc[i].fillna(0).to_dict()
             with db.session() as session:
                 query = """
                     UNWIND $nodes AS node
                     MATCH (m:Movie { title: node.title })
                     MATCH (g:Genre { name: node.genre })
-                    CREATE (g)-[:ASSOCIATED_WITH {accuracy: 1.0} ]->(m)
+                    CREATE (m)-[:ASSOCIATED_WITH {accuracy: 1.0} ]->(g)
                     RETURN m, g
                 """
 
@@ -142,50 +164,92 @@ class Core(object):
         self.load_user_relations(db, user_relations_df)
         self.load_genre_relations(db, genre_relations_df)
 
-    '''
-    def get_recommendation(self, db, movie_description) -> list:
+    
+    def similar(
+        self,
+        left_classifiers,
+        left_features,
+        right_classifiers,
+        right_features,
+    ) -> float:
+        # Проверка размеров входных данных
+        left_size = len(left_classifiers)
+        right_size = len(right_classifiers)
+        
+        if left_size == 0 or right_size == 0:
+            return 0.0
+        
+        if left_size != len(left_features):
+            raise ValueError(f"Длина left_classifiers ({left_size}) должна быть равна длине left_features ({len(left_features)})")
+            
+        if right_size != len(right_features):
+            raise ValueError(f"Длина right_classifiers ({right_size}) должна быть равна длине right_features ({len(right_features)})")
 
-        serializer = DataSerializer()
+        # Создание объединения классификаторов
+        union_classifier_set = set(left_classifiers)
+        union_classifier_set.update(right_classifiers)
+        union_classifiers = list(union_classifier_set)
 
-        title = movie_description['title']
-        director = movie_description['director']
+        # Получение векторов признаков
+        left_vector = self.get_features_vector(left_classifiers, left_features, union_classifiers)
+        right_vector = self.get_features_vector(right_classifiers, right_features, union_classifiers)
 
-        with db.session() as session:
-            query = """
-                OPTIONAL MATCH (movie:Movie)<-[:MADE]-(director:Director)
-                WHERE movie.title CONTAINS $title
-                AND director.name CONTAINS $director
-                RETURN movie
-                ORDER BY movie.mpaa_rating
-                LIMIT 5
-            """
+        # Вычисление косинусного сходства
+        result = self.cosine(left_vector, right_vector)
+        return 0.0 if math.isnan(result) else result
 
-            result = session.run(query, title=title, director=director)
 
-            return [serializer.serialize_movie(record["movie"]) for record in result]
-    '''
+    def cosine(self, vector_a, vector_b):
+        """Вычисляет косинусное сходство между двумя векторами."""
+        dot_product = sum(a * b for a, b in zip(vector_a, vector_b))
+        norm_a = math.sqrt(sum(x * x for x in vector_a))
+        norm_b = math.sqrt(sum(x * x for x in vector_b))
+        
+        return dot_product / (norm_a * norm_b)
+
+    def get_features_vector(
+        self,
+        classifiers,
+        classifier_features,
+        union_classifiers
+    ):
+        """Создает вектор признаков на основе классификаторов и их значений."""
+        classifier_to_features = dict(zip(classifiers, classifier_features))
+        return [
+            classifier_to_features.get(classifier, 0.0)
+            for classifier in union_classifiers
+    ]
+
 
     def get_content_based_recommendation(self, db, recommendation_meta_info):
-
         user = recommendation_meta_info['user']
 
         with db.session() as session:
             query = """
-                MATCH (u:User { name: $user })-[:HAS_WATCHED]->(m:Movie)-[r:IS_ASSOCIATED_WITH]->(g:Genre)
+                MATCH (u:User { name: $user })-[:HAS_WATCHED]->(m:Movie)-[r:ASSOCIATED_WITH]->(g:Genre)
                 WITH u, g.id AS classifier, sum(r.accuracy) AS features
                 WITH u, collect(classifier) AS ux_classifiers, collect(features) AS ux_features
-                MATCH (m:Movie)-[r:IS_ASSOCIATED_WITH]->(g:Genre)
-                    WHERE NOT (u)-[:HAS_WATCHED]->(m)
-                WITH m.title AS title, ux_classifiers, ux_features, collect(g.id) AS classifiers, collect(r.accuracy) AS features,
+                MATCH (m:Movie)-[r:ASSOCIATED_WITH]->(g:Genre)
+                WHERE NOT (u)-[:HAS_WATCHED]->(m)
+                WITH 
+                    m.title AS title,
+                    ux_classifiers,
+                    ux_features,
+                    collect(g.id) AS classifiers,
+                    collect(r.accuracy) AS features,
                     collect(g.name) AS genres
-                WITH title, genres, alg.classifiers.similar(ux_classifiers, ux_features, classifiers, features) AS score
-                    WHERE score > 0.4
-                RETURN title, genres, score
-                ORDER BY score DESC
-                LIMIT 5
+                RETURN title, ux_classifiers, ux_features, classifiers, features, genres
             """
             result = session.run(query, user=user)
-            return result
+
+            movies = [self.serializer.serialize_content_based_raw(record) for record in result]
+            processed_movies = []
+            for movie in movies:
+                tmp_score = self.similar(movie['ux_classifiers'], movie['ux_features'], movie['classifiers'], movie['features'])
+                if tmp_score > SIMILARITY_LIMIT:
+                    processed_movies.append({'title': movie['title'], 'genres': movie['genres'], 'score': tmp_score})
+            
+            return sorted(processed_movies, key=lambda movie: movie['score'], reverse=True)
 
 
     def get_collaborative_filtering_recommendation(self, db, recommendation_meta_info):
@@ -193,25 +257,63 @@ class Core(object):
         user = recommendation_meta_info['user']
 
         with db.session() as session:
-            query = """
-                MATCH (u:User { name: $user })-[:HAS_WATCHED]->(m:Movie)-[r:IS_ASSOCIATED_WITH]->(g:Genre)
+            query="""
+                MATCH (u:User { name: $user })-[:HAS_WATCHED]->(m:Movie)-[r:ASSOCIATED_WITH]->(g:Genre)
                 WITH u, g.id AS classifier, SUM(r.accuracy) AS total_accuracy
                 WITH u, COLLECT(classifier) AS ux_classifiers, COLLECT(total_accuracy) AS ux_features
-                MATCH (similar:User)-[:HAS_WATCHED]->(m:Movie)-[r:IS_ASSOCIATED_WITH]->(g:Genre)
-                    WHERE similar <> u
+                MATCH (similar:User)-[:HAS_WATCHED]->(m:Movie)-[r:ASSOCIATED_WITH]->(g:Genre)
+                WHERE similar <> u
                 WITH u, similar, ux_classifiers, ux_features, g.id AS classifier, SUM(r.accuracy) AS total_feature
-                WITH u, similar, ux_classifiers, ux_features, COLLECT(classifier) AS classifiers, COLLECT(total_feature) AS features
-                WITH u, similar, ux_classifiers, ux_features, alg.classifiers.similar(ux_classifiers, ux_features, classifiers, features) AS score
-                    WHERE score > 0.6
-                MATCH (m:Movie)-[r:IS_ASSOCIATED_WITH]->(g:Genre)
-                    WHERE NOT (u)-[:HAS_WATCHED]->(m) AND (similar)-[:HAS_WATCHED]-(m)
-                WITH ux_classifiers, ux_features, m.title AS title, COLLECT(g.id) AS classifiers, COLLECT(r.accuracy) AS features,
-                    COLLECT(g.name) AS genres
-                WITH title, alg.classifiers.similar(ux_classifiers, ux_features, classifiers, features) AS score
-                RETURN title, score
-                ORDER BY score DESC
-                LIMIT 5
+                WITH u AS user, similar, ux_classifiers, ux_features, COLLECT(classifier) AS classifiers, COLLECT(total_feature) AS features
+                RETURN user, similar, ux_classifiers, ux_features, classifiers, features
             """
-            result = session.run(query, user=user)
-            return result
 
+            result = session.run(query, user=user)
+            records = [self.serializer.serialize_collaborative_similar_users(record) for record in result]
+            
+            processed_records = []
+            for record in records:
+                tmp_score = self.similar(record['ux_classifiers'], record['ux_features'], record['classifiers'], record['features'])
+                if tmp_score > SIMILARITY_LIMIT:
+                    processed_records.append({
+                        'user': record['user'], 
+                        'similar': record['similar'], 
+                        'ux_classifiers': record['ux_classifiers'], 
+                        'ux_features': record['ux_features'], 
+                        'classifiers': record['classifiers'], 
+                        'features': record['features'], 
+                        'score': tmp_score
+                    })
+
+            query="""
+                UNWIND $similars AS similar
+                UNWIND $ux_classifiers_list AS ux_classifiers
+                UNWIND $ux_features_list AS ux_features
+                MATCH (m:Movie)-[r:ASSOCIATED_WITH]->(g:Genre)
+                WHERE NOT (:User { name: $user })-[:HAS_WATCHED]->(m) AND (:User { name: similar.name })-[:HAS_WATCHED]-(m)
+                WITH 
+                    m.title AS title, 
+                    ux_classifiers, 
+                    ux_features, 
+                    COLLECT(g.id) AS classifiers, 
+                    COLLECT(r.accuracy) AS features,
+                    COLLECT(g.name) AS genres
+                RETURN title, ux_classifiers, ux_features, classifiers, features, genres
+            """
+
+            result = session.run(
+                query, 
+                user=user, 
+                similars=[record['similar'] for record in processed_records],
+                ux_classifiers_list=[record['ux_classifiers'] for record in processed_records],
+                ux_features_list=[record['ux_features'] for record in processed_records]
+            )
+
+            movies = [self.serializer.serialize_collaborative(record) for record in result]
+            processed_movies = []
+            for movie in movies:
+                tmp_score = self.similar(movie['ux_classifiers'], movie['ux_features'], movie['classifiers'], movie['features'])
+                if tmp_score > SIMILARITY_LIMIT:
+                    processed_movies.append({'title': movie['title'], 'genres': movie['genres'], 'score': tmp_score})
+            
+            return sorted(processed_movies, key=lambda movie: movie['score'], reverse=True)[0:5]

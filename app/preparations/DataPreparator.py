@@ -24,6 +24,8 @@ class DataPreparator(object):
             'genre'
         ]]
 
+        self.movies_df['id'] = [i for i in range(len(self.movies_df))]
+
         if self.enable_saving_to_csv:
             self.movies_df.to_csv('./tmp/nodes_movies.csv', index=False)
 
@@ -34,11 +36,13 @@ class DataPreparator(object):
         directors_df = self.df[['Directed_By']]
 
         directors_list = []
-        
+        i = 0
+
         for directors in directors_df['Directed_By'].fillna('').str.split(','):
             if isinstance(directors, list):
                 for director in directors:
-                    directors_list.append({'name': director.strip()})
+                    directors_list.append({'id': i,'name': director.strip()})
+                    i += 1
         
         self.directors_list_df = pd.DataFrame(directors_list)
         
@@ -51,10 +55,14 @@ class DataPreparator(object):
     def get_genres(self, path: str) -> pd.DataFrame:
         self.genres_df = pd.read_csv(path)
 
+        self.genres_df['id'] = [i for i in range(len(self.genres_df))]
+
         return self.genres_df
     
     def get_users(self, path: str) -> pd.DataFrame:
         self.users_df = pd.read_csv(path)
+
+        self.users_df['id'] = [i for i in range(len(self.users_df))]
 
         return self.users_df
 
@@ -99,11 +107,11 @@ class DataPreparator(object):
         relations = []
         for idx, row in self.df.iterrows():
             if pd.notna(row['rated_by']):
-                for user in row['rated_by'].split(','):
-                    relations.append({
-                        'title': row['title'],
-                        'userId': user.strip()
-                    })
+                # for user in row['rated_by'].split(','):
+                relations.append({
+                    'title': row['title'],
+                    'userId': row['rated_by']
+                })
 
         relations_df = pd.DataFrame(relations)
 
