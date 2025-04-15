@@ -5,10 +5,11 @@ import argparse
 
 parser = argparse.ArgumentParser()
     
-parser.add_argument("--title", action ="store", dest='title', required=True, help="""Название фильма""")
-parser.add_argument("--director", action ="store", dest='director', required=True, help="""Режиссер""")
-parser.add_argument("--price", action ="store", dest='price', required=True, help="""Цена""")
-parser.add_argument("--starring", action ="store", dest='starring', required=True, help="""Актерский состав""")
+parser.add_argument("--title", action ="store", dest='title', required=False, help="""Название фильма""")
+parser.add_argument("--director", action ="store", dest='director', required=False, help="""Режиссер""")
+parser.add_argument("--price", action ="store", dest='price', required=False, help="""Цена""")
+parser.add_argument("--user", action ="store", dest='user', required=False, help="""Пользователь""")
+parser.add_argument("--starring", action ="store", dest='starring', required=False, help="""Актерский состав""")
 
 args = parser.parse_args()
 
@@ -29,18 +30,20 @@ def main():
 
     core = Core()
 
-    core.load_csvs(db, movies, directors, users, genres)
-    core.load_relations(db, director_relations, user_relations, genre_relations)
-
+    # core.load_csvs(db, movies, directors, users, genres)
+    # core.load_relations(db, director_relations, user_relations, genre_relations)
     recommendation_meta_info = {
-        'title': args['title'],
-        'director': args['director'],
-        'price': args['price'],
-        'starring': args['starring']
+        'user': args.user,
+        # 'title': args['title'],
+        # 'director': args['director'],
+        # 'price': args['price'],
+        # 'starring': args['starring']
     }
 
-    rec1 = core.get_content_based_recommendation(db, recommendation_meta_info)
+    # rec1 = core.get_content_based_recommendation(db, recommendation_meta_info)
+    # print(rec1)
     rec2 = core.get_collaborative_filtering_recommendation(db, recommendation_meta_info)
+    print(rec2)
 
     db_connector.close_connection()
 
