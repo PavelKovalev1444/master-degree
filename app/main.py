@@ -81,10 +81,9 @@ def main():
 
     if int(filter_type) == 1:
         content_recs = core.get_content_based_recommendation(db, recommendation_meta_info)
-
         if not result_file_name:
             print("Content-based filtering result:")
-            for i in range(0, min(limit, content_recs.length)):
+            for i in range(0, min(limit, len(content_recs))):
                 print(content_recs[i])
         else:
             data_preparator.save_data_to_file(f'content_based_{result_file_name}', content_recs[0:int(limit)])
@@ -94,7 +93,7 @@ def main():
 
         if not result_file_name:
             print("Collaborative filtering result:")
-            for i in range(0, min(limit, collab_recs.length)):
+            for i in range(0, min(limit, len(collab_recs))):
                 print(collab_recs[i])
         else:
             data_preparator.save_data_to_file(f'collaborative_{result_file_name}', content_recs[0:int(limit)])
